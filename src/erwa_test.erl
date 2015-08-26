@@ -25,6 +25,12 @@
 							?DUMMY_TABLE_RECORD_MNESIA_TABLE_ATTRIBUTES
 							]).
 
+-define(DATABASE_PATH_TOP, 
+	begin
+		{ok,CWD} = file:get_cwd(),
+		lists:concat([CWD, "/dbase/Mnesia/"])
+	end).
+
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -32,25 +38,24 @@
 
 init() ->
 	%% Check MNESIA tables. Halt ErlangVM is no local_tables found.
-	case mnesia:system_info(local_tables) of
-		[] ->
-			error_logger:info_report(["No local MNESIA tables are have been found"]),
+
+	%% Create dummy dir if it does not exists.
+	Path = lists:concat([?DATABASE_PATH_TOP, "/dummy"]),
+	
+	case file:list_dir(Path) of
+		{ok,_} ->
+			error_logger:info_report(["MNESIA system info", {tables, mnesia:system_info()}]);
 			
-			init_mnesia_tables(),
-			
-			error_logger:info_report(["Halt Erlang VM"]),
-			erlang:halt();
-		T ->
-			case lists:member(?DUMMY_TABLE_RECORD_MNESIA_TABLE, T) of
-				true ->
-					error_logger:info_report(["Local MNESIA tables have been found", {tables, T}]);
-				false ->
-					error_logger:info_report(["Local MNESIA tables have been found, but dummy table is missing", {tables, T}]),
-					
+		_->	%% Create directroy.
+			case os:cmd(lists:concat(["mkdir -p ", Path])) of
+				[] ->
 					init_mnesia_tables(),
 					
 					error_logger:info_report(["Halt Erlang VM"]),
-					erlang:halt()
+					erlang:halt();
+				ER ->
+					error_logger:error_report(["Failed to create dir.", {pwd, file:get_cwd()}, {path, Path}, {error, ER}]),
+					ok
 			end
 	end.
 
@@ -71,10 +76,10 @@ init_mnesia_tables() ->
 	error_logger:info_report(["Re-start MNESIA"]),
 	mnesia:start(),
 	
-	error_logger:info_report(["Create MNESIA tables"]),
-	create_all_mnesia_table(?MNESIA_TABLE_LIST),
-	
-	waiting_for_mnesia_tables(?MNESIA_TABLE_LIST, 500, 5, do_crash_when_failed),
+%% 	error_logger:info_report(["Create MNESIA tables"]),
+%% 	create_all_mnesia_table(?MNESIA_TABLE_LIST),
+%% 	
+%% 	waiting_for_mnesia_tables(?MNESIA_TABLE_LIST, 500, 5, do_crash_when_failed),
 	ok.
 
 %% ====================================================================
@@ -159,3 +164,29 @@ waiting_for_mnesia_tables_loop(Tabs,Timeout,Retries,ShouldDoCrashWhenFailed) ->
 					[]
 			end
     end.
+
+%% ====================================================================
+%% This function will give the path of MNESIA database
+%% Input:
+%%	-
+%% Output:
+%% The path of database where the MNESIA tables are stored.
+%% ====================================================================
+get_database_path()->	
+	%% Calculate database path
+	Path = ?DATABASE_PATH_TOP,
+
+	%% Create the dir if it does not exists.
+	case file:list_dir(Path) of
+		{ok,_} ->
+			Path;
+		_->	%% Create directroy.
+			case os:cmd(lists:concat(["mkdir -p ", Path])) of
+				[] ->
+					Path;
+				ER ->
+					error_logger:error_report(["Failed to create DB dir.", {pwd, file:get_cwd()}, {path, Path}, {error, ER}]),
+					ok
+			end
+	end.
+
