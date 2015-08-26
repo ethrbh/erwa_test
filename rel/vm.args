@@ -1,0 +1,4 @@
+-name erwa_test@127.0.0.1
+-setcookie erwa_test
+-heart
+-mnesia dir '"./dbase/Mnesia/"'
